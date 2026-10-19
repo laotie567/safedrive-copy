@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# 编译产物（由 build.sh 生成）
+app/*.app/
+app/**/*.app/
+
+# 日志与临时文件
+*.log
+*.tmp
+*.xfertmp
+*.swp
+
+# 编辑器
+.vscode/
+.idea/
+*.xcuserstate
+
+# 测试临时产物
+qa/**/engine-test
