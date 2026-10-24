@@ -260,9 +260,18 @@ final class ContentView: NSView {
 
     private static let defaultsKey = "LastTargetFolderPath"
 
-    /// 首次启动的默认目标：自动挑一个外接 NTFS 卷；没有就落到桌面
-    private static var defaultTarget: URL {
+    /// 首次启动的默认目标：
+    /// 1) 上次记住的目录（仍存在且可写则沿用）
+    /// 2) 可写的 NTFS 外接卷
+    /// 3) 只读的 NTFS 外接卷（提示用户开启读写）
+    /// 4) 桌面
+    private static func resolveDefaultTarget() -> URL {
+        if let saved = UserDefaults.standard.string(forKey: defaultsKey),
+           FileManager.default.fileExists(atPath: saved) {
+            return URL(fileURLWithPath: saved)
+        }
         if let v = VolumeLocator.preferredExternalVolume() { return v }
+        if let ro = VolumeLocator.externalCandidates().first { return ro }
         return URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Desktop")
     }
 
@@ -326,8 +335,7 @@ final class ContentView: NSView {
     // MARK: 初始化
 
     override init(frame frameRect: NSRect) {
-        let saved = UserDefaults.standard.string(forKey: Self.defaultsKey)
-        targetURL = URL(fileURLWithPath: saved ?? Self.defaultTarget.path)
+        targetURL = Self.resolveDefaultTarget()
         super.init(frame: frameRect)
         Log.startSession()
         Log.write("ContentView 初始化，目标=\(targetURL.path)")

@@ -43,13 +43,27 @@ enum VolumeLocator {
         (try? url.resourceValues(forKeys: [.volumeNameKey]).volumeName) ?? url.lastPathComponent
     }
 
-    /// 优先返回一个可写的外接 NTFS 卷；没有就返回任一外接卷
+    /// 是否为 dmg / 安装镜像等临时挂载卷（不应作为复制目标）
+    static func isDiskImage(_ url: URL) -> Bool {
+        guard let line = mountLine(for: url) else { return true }
+        // 安装镜像通常带 quarantine / nobrowse；退一步：底层不是 /dev/disk 也视为不可用
+        if line.contains("quarantine") || line.contains("nobrowse") { return true }
+        guard let dev = line.split(separator: " ").first else { return true }
+        return !dev.hasPrefix("/dev/disk")
+    }
+
+    /// 可作为默认目标的外接卷：必须是真正可写的 NTFS 卷。
+    /// 刻意不做「随便挑一个卷」的兜底——选到只读镜像或系统盘会误导用户。
     static func preferredExternalVolume() -> URL? {
-        let vols = mountedVolumes()
-        let ntfs = vols.filter(isNTFS)
-        if let writable = ntfs.first(where: { !isReadOnly($0) }) { return writable }
-        if let any = ntfs.first { return any }
-        return vols.first
+        mountedVolumes()
+            .filter { !isDiskImage($0) }
+            .filter { isNTFS($0) }
+            .first { !isReadOnly($0) }
+    }
+
+    /// 界面上用于提示的候选卷（含只读的，便于引导用户开启读写）
+    static func externalCandidates() -> [URL] {
+        mountedVolumes().filter { !isDiskImage($0) && isNTFS($0) }
     }
 
     /// 一次 mount 调用解析出指定挂载点对应的那一行
